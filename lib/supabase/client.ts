@@ -1,12 +1,9 @@
 import { createBrowserClient } from '@supabase/ssr'
+import { createSafeFetch, readSupabaseEnv } from './env'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
+const { url: SUPABASE_URL, key: SUPABASE_KEY, isConfigured } = readSupabaseEnv()
 
-export const isSupabaseConfigured =
-  SUPABASE_URL.startsWith('https://') &&
-  SUPABASE_URL.includes('.supabase.co') &&
-  SUPABASE_KEY.length > 100 // real anon keys are ~200 chars
+export const isSupabaseConfigured = isConfigured
 
 /**
  * Creates a Supabase browser client.
@@ -16,6 +13,7 @@ export const isSupabaseConfigured =
 export const createClient = () => {
   return createBrowserClient(
     isSupabaseConfigured ? SUPABASE_URL : 'https://placeholder.supabase.co',
-    isSupabaseConfigured ? SUPABASE_KEY : 'placeholder-key'
+    isSupabaseConfigured ? SUPABASE_KEY : 'placeholder-key',
+    { global: { fetch: createSafeFetch() } }
   )
 }

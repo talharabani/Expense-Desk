@@ -42,20 +42,46 @@ export function readSupabaseEnv() {
   const urlLooksValid = url.startsWith('https://') && url.includes('.supabase.co')
   const keyLooksValid = key.length > 100
 
-  if (keyLooksValid && !isHeaderSafe(key)) {
-    // Loud, specific, and safe to log: says what is wrong without printing the key.
+  const isConfigured =
+    urlLooksValid && keyLooksValid && isHeaderSafe(url) && isHeaderSafe(key)
+
+  if (!isConfigured) {
+    // Falling back to the placeholder client produces a confusing
+    // ERR_NAME_NOT_RESOLVED against placeholder.supabase.co, so say exactly
+    // which check failed. Never logs the values themselves.
+    const problems: string[] = []
+
+    if (!url) {
+      problems.push('NEXT_PUBLIC_SUPABASE_URL is empty or missing at build time')
+    } else if (!urlLooksValid) {
+      problems.push(
+        `NEXT_PUBLIC_SUPABASE_URL is set (${url.length} chars) but is not an https://<project>.supabase.co URL`
+      )
+    } else if (!isHeaderSafe(url)) {
+      problems.push('NEXT_PUBLIC_SUPABASE_URL contains a character that is not valid in an HTTP header')
+    }
+
+    if (!key) {
+      problems.push('NEXT_PUBLIC_SUPABASE_ANON_KEY is empty or missing at build time')
+    } else if (!keyLooksValid) {
+      problems.push(
+        `NEXT_PUBLIC_SUPABASE_ANON_KEY is only ${key.length} chars; a legacy anon JWT is ~200. It looks truncated`
+      )
+    } else if (!isHeaderSafe(key)) {
+      problems.push(
+        'NEXT_PUBLIC_SUPABASE_ANON_KEY contains a non-Latin-1 character (a smart quote, ellipsis, or zero-width space from copy-paste)'
+      )
+    }
+
+    console.error('Supabase is NOT configured, so requests go to placeholder.supabase.co and fail:')
+    problems.forEach((problem) => console.error('  - ' + problem))
     console.error(
-      'NEXT_PUBLIC_SUPABASE_ANON_KEY contains a non-Latin-1 character and cannot be sent as an HTTP header. ' +
-        'It was most likely copied through an editor that substituted a smart quote, an ellipsis, or a zero-width space. ' +
-        'Re-copy it from Supabase Dashboard -> Settings -> API and paste it as plain text.'
+      'NEXT_PUBLIC_* values are baked in at build time: set them in Vercel for the Production ' +
+        'environment, then redeploy with "Use existing Build Cache" unticked.'
     )
   }
 
-  return {
-    url,
-    key,
-    isConfigured: urlLooksValid && keyLooksValid && isHeaderSafe(url) && isHeaderSafe(key),
-  }
+  return { url, key, isConfigured }
 }
 
 /** Header name -> plain-English cause, for the diagnostic below. */

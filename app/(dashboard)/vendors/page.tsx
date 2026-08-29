@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useAsyncEffect } from '@/lib/hooks/use-async-effect'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,10 @@ interface Vendor {
   phone: string | null
   email: string | null
   services: string | null
+  payment_terms: string | null
+  address: string | null
+  tax_number: string | null
+  bank_details: string | null
   total_paid: number
   outstanding: number
   status: string
@@ -41,15 +46,14 @@ export default function VendorsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [search, setSearch] = useState('')
 
-  async function load() {
-    setLoading(true)
+  const load = useCallback(async () => {
     const r = await fetch('/api/vendors' + (search ? `?search=${encodeURIComponent(search)}` : ''))
     if (r.ok) setVendors(await r.json())
     else setError('Failed to load vendors')
     setLoading(false)
-  }
+  }, [search])
 
-  useEffect(() => { load() }, [search])
+  useAsyncEffect(load)
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -69,7 +73,7 @@ export default function VendorsPage() {
         const err = await r.json()
         setError(err.error || 'Failed to register vendor')
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred during vendor registration.')
     } finally {
       setSubmitting(false)
@@ -95,7 +99,7 @@ export default function VendorsPage() {
         const err = await r.json()
         setError(err.error || 'Failed to update vendor details')
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred during save.')
     } finally {
       setSubmitting(false)
@@ -117,7 +121,7 @@ export default function VendorsPage() {
         const err = await r.json()
         setError(err.error || 'Failed to delete vendor')
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred during deletion.')
     } finally {
       setSubmitting(false)
@@ -133,10 +137,10 @@ export default function VendorsPage() {
       phone: v.phone ?? '',
       email: v.email ?? '',
       services: v.services ?? '',
-      payment_terms: (v as any).payment_terms ?? '',
-      address: (v as any).address ?? '',
-      tax_number: (v as any).tax_number ?? '',
-      bank_details: (v as any).bank_details ?? '',
+      payment_terms: v.payment_terms ?? '',
+      address: v.address ?? '',
+      tax_number: v.tax_number ?? '',
+      bank_details: v.bank_details ?? '',
       status: v.status
     })
   }
@@ -380,7 +384,7 @@ export default function VendorsPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm border border-gray-100 overflow-hidden p-6 space-y-4">
             <h3 className="text-lg font-bold text-gray-900">Delete Supplier relationship?</h3>
             <p className="text-sm text-gray-400">
-              Are you sure you want to delete <span className="font-semibold text-gray-900">"{deletingVendor.name}"</span>? This will remove all database connections and references linked to this supplier.
+              Are you sure you want to delete <span className="font-semibold text-gray-900">&ldquo;{deletingVendor.name}&rdquo;</span>? This will remove all database connections and references linked to this supplier.
             </p>
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setDeletingVendor(null)}>Cancel</Button>

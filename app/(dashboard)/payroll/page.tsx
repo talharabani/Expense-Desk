@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useAsyncEffect } from '@/lib/hooks/use-async-effect'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -54,15 +55,14 @@ export default function PayrollPage() {
     Number(form.advance_deduction), Number(form.tax),
   ].reduce((s, v) => s + v, 0)
 
-  async function load() {
-    setLoading(true)
+  const load = useCallback(async () => {
     const [prRes, accRes] = await Promise.all([fetch('/api/payroll'), fetch('/api/accounts')])
     if (prRes.ok) setRecords(await prRes.json())
     if (accRes.ok) setAccounts(await accRes.json())
     setLoading(false)
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useAsyncEffect(load)
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()

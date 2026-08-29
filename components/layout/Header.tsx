@@ -89,10 +89,14 @@ export function Header() {
       .catch(() => {})
   }, [pathname])
 
-  // Close mobile drawer on routing
-  useEffect(() => {
+  // Close the mobile drawer whenever the route changes. Adjusting state during
+  // render (rather than in an effect) avoids an extra render pass with the
+  // drawer still open on the new page.
+  const [drawerPath, setDrawerPath] = useState(pathname)
+  if (drawerPath !== pathname) {
+    setDrawerPath(pathname)
     setMobileOpen(false)
-  }, [pathname])
+  }
 
   async function signOut() {
     const supabase = createClient()

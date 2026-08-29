@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useAsyncEffect } from '@/lib/hooks/use-async-effect'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -94,8 +95,7 @@ export default function ExpenseDetailPage() {
     }
   }
 
-  async function load() {
-    setLoading(true)
+  const load = useCallback(async () => {
     const r = await fetch(`/api/expenses/${id}`)
     if (r.ok) {
       const d = await r.json()
@@ -116,9 +116,9 @@ export default function ExpenseDetailPage() {
       setError('Expense not found')
     }
     setLoading(false)
-  }
+  }, [id])
 
-  useEffect(() => { load() }, [id])
+  useAsyncEffect(load)
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -237,7 +237,7 @@ export default function ExpenseDetailPage() {
       {deleting && (
         <div className="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/30 p-5 space-y-4">
           <div>
-            <p className="font-semibold text-red-800 dark:text-red-200">Delete "{expense.title}"?</p>
+            <p className="font-semibold text-red-800 dark:text-red-200">Delete &ldquo;{expense.title}&rdquo;?</p>
             <p className="text-sm text-red-600 dark:text-red-400 mt-1">
               {expense.currency} {Number(expense.amount).toLocaleString()} · {expense.status}
             </p>

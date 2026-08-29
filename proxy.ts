@@ -2,12 +2,12 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { readSupabaseEnv } from '@/lib/supabase/env'
 
-// Hard ceiling for the Supabase auth round-trip. Vercel kills middleware at 25s;
+// Hard ceiling for the Supabase auth round-trip. Vercel kills the proxy at 25s;
 // staying well under that means a slow/unreachable Supabase degrades to
 // "session not refreshed" instead of a 504 on every route.
 const AUTH_TIMEOUT_MS = 5000
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
 
   // Skip middleware if env vars aren't configured yet, or if they carry paste

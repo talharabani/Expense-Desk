@@ -19,6 +19,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Optional receipt metadata: when supplied, reject a receipt that matches an
+    // already-uploaded one on vendor, amount and date.
+    const vendorName = formData.get('vendorName') as string | null
+    const amountRaw = formData.get('amount') as string | null
+    const transactionDate = formData.get('transactionDate') as string | null
+    const amount = amountRaw ? Number(amountRaw) : null
+
+    if (vendorName || amount || transactionDate) {
+      const isDuplicate = await checkDuplicateDocument(
+        user.companyId,
+        vendorName,
+        Number.isFinite(amount) ? amount : null,
+        transactionDate
+      )
+      if (isDuplicate) {
+        return NextResponse.json(
+          { error: 'A receipt with the same vendor, amount and date already exists' },
+          { status: 409 }
+        )
+      }
+    }
+
     const document = await uploadDocument(
       file,
       entityType,

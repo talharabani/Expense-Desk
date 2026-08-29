@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useCallback, useState } from 'react'
+import { useAsyncEffect } from '@/lib/hooks/use-async-effect'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,6 +20,8 @@ interface Subscription {
   currency: string
   billing_cycle: string
   renewal_date: string
+  login_email: string | null
+  notes: string | null
   status: string
   renewing_soon: boolean
   trial_expiring_soon: boolean
@@ -42,15 +45,14 @@ export default function SubscriptionsPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
 
-  async function load() {
-    setLoading(true)
+  const load = useCallback(async () => {
     const r = await fetch('/api/subscriptions')
     if (r.ok) setSubs(await r.json())
     else setError('Failed to load subscriptions')
     setLoading(false)
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useAsyncEffect(load)
 
   const monthlyTotal = subs.filter(s => s.status === 'active').reduce((sum, s) => {
     if (s.billing_cycle === 'monthly') return sum + s.total_cost
@@ -81,7 +83,7 @@ export default function SubscriptionsPage() {
         const err = await r.json()
         setError(err.error || 'Failed to create subscription')
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred during creation.')
     } finally {
       setSubmitting(false)
@@ -111,7 +113,7 @@ export default function SubscriptionsPage() {
         const err = await r.json()
         setError(err.error || 'Failed to save changes')
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred during save.')
     } finally {
       setSubmitting(false)
@@ -133,7 +135,7 @@ export default function SubscriptionsPage() {
         const err = await r.json()
         setError(err.error || 'Failed to delete subscription')
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred during deletion.')
     } finally {
       setSubmitting(false)
@@ -150,8 +152,8 @@ export default function SubscriptionsPage() {
       currency: sub.currency,
       billing_cycle: sub.billing_cycle,
       renewal_date: sub.renewal_date,
-      login_email: (sub as any).login_email ?? '',
-      notes: (sub as any).notes ?? '',
+      login_email: sub.login_email ?? '',
+      notes: sub.notes ?? '',
       status: sub.status
     })
   }
@@ -410,7 +412,7 @@ export default function SubscriptionsPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm border border-gray-100 overflow-hidden p-6 space-y-4">
             <h3 className="text-lg font-bold text-gray-900">Delete Subscription?</h3>
             <p className="text-sm text-gray-400">
-              Are you sure you want to delete <span className="font-semibold text-gray-900">"{deletingSub.tool_name}"</span>? This action is permanent and will delete the subscription record.
+              Are you sure you want to delete <span className="font-semibold text-gray-900">&ldquo;{deletingSub.tool_name}&rdquo;</span>? This action is permanent and will delete the subscription record.
             </p>
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setDeletingSub(null)}>Cancel</Button>

@@ -21,8 +21,26 @@ const REPORT_TYPES = [
   { value: 'vendor_payment', label: 'Vendor Payments' },
 ]
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function renderReportData(type: string, data: any) {
+type ReportRow = {
+  date: string
+  title: string
+  type: string
+  category: string
+  currency?: string
+  amount?: number
+  converted_amount?: number
+}
+
+type ReportData = {
+  totalIncome?: number
+  totalExpenses?: number
+  netProfit?: number
+  profitMargin?: number
+  total?: number
+  rows?: ReportRow[]
+}
+
+function renderReportData(type: string, data: ReportData | null) {
   if (!data) return null
   if (type === 'profit_and_loss') {
     return (
@@ -31,7 +49,7 @@ function renderReportData(type: string, data: any) {
           {[
             { label: 'Total Income', value: data.totalIncome, color: 'text-emerald-600', icon: TrendingUp, iconColor: 'text-emerald-500' },
             { label: 'Total Expenses', value: data.totalExpenses, color: 'text-rose-600', icon: TrendingDown, iconColor: 'text-rose-500' },
-            { label: 'Net Profit', value: data.netProfit, color: data.netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600', icon: DollarSign, iconColor: data.netProfit >= 0 ? 'text-emerald-500' : 'text-rose-500' },
+            { label: 'Net Profit', value: data.netProfit, color: (data.netProfit ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600', icon: DollarSign, iconColor: (data.netProfit ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' },
             { label: 'Profit Margin', value: `${data.profitMargin?.toFixed(1)}%`, color: 'text-[#2c443e]', icon: Percent, iconColor: 'text-[#c19a3b]' },
           ].map(item => (
             <Card key={item.label} className="border-none bg-[#e4ebe8]/40 shadow-none rounded-2xl">
@@ -61,7 +79,7 @@ function renderReportData(type: string, data: any) {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.rows.map((row: any, i: number) => (
+                  {data.rows.map((row, i) => (
                     <tr key={i} className="border-b border-[#e4ebe8]/40 last:border-0 hover:bg-[#e4ebe8]/10 transition-colors">
                       <td className="px-4 py-3 font-semibold text-[#2c443e]">{row.date}</td>
                       <td className="px-4 py-3 font-medium text-[#2c443e]">{row.title}</td>
@@ -135,7 +153,7 @@ function renderReportData(type: string, data: any) {
   return <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">{JSON.stringify(data, null, 2)}</pre>
 }
 
-function renderPrintReportTable(type: string, data: any) {
+function renderPrintReportTable(type: string, data: ReportData | null) {
   if (!data) return null
   if (type === 'profit_and_loss') {
     return (
@@ -152,7 +170,7 @@ function renderPrintReportTable(type: string, data: any) {
           </div>
           <div className="bg-[#e4ebe8]/60 p-3 rounded-xl border border-[#e4ebe8]">
             <span className="text-[8px] font-bold text-[#6c857f] uppercase">Net Profit</span>
-            <p className={`font-extrabold text-xs mt-1 ${data.netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+            <p className={`font-extrabold text-xs mt-1 ${(data.netProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
               PKR {data.netProfit?.toLocaleString()}
             </p>
           </div>
@@ -175,7 +193,7 @@ function renderPrintReportTable(type: string, data: any) {
               </tr>
             </thead>
             <tbody>
-              {data.rows.slice(0, 15).map((row: any, i: number) => (
+              {data.rows.slice(0, 15).map((row, i) => (
                 <tr key={i} className={i % 2 === 0 ? 'bg-[#e4ebe8]/20' : 'bg-white'}>
                   <td className="px-3 py-2 text-[#2c443e] font-semibold">{row.date}</td>
                   <td className="px-3 py-2 text-[#2c443e]">{row.title}</td>
@@ -233,10 +251,10 @@ function renderPrintReportTable(type: string, data: any) {
   return null
 }
 
-function downloadCSV(type: string, data: Record<string, unknown>[]) {
+function downloadCSV(type: string, data: ReportRow[]) {
   if (!data?.length) return
   const keys = Object.keys(data[0])
-  const csv = [keys.join(','), ...data.map(r => keys.map(k => JSON.stringify(r[k] ?? '')).join(','))].join('\n')
+  const csv = [keys.join(','), ...data.map(r => keys.map(k => JSON.stringify((r as unknown as Record<string, unknown>)[k] ?? '')).join(','))].join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -250,8 +268,8 @@ export default function ReportsPage() {
   const [reportType, setReportType] = useState('profit_and_loss')
   const [from, setFrom] = useState('2026-08-01')
   const [to, setTo] = useState('2026-08-31')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<ReportData | null>(null)
+  const [reportNo, setReportNo] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [userName, setUserName] = useState('Finance Manager')
@@ -289,6 +307,7 @@ export default function ReportsPage() {
     const r = await fetch(`/api/reports/${reportType}?${params}`)
     if (r.ok) {
       setResult(await r.json())
+      setReportNo(String(Math.floor(100000 + Math.random() * 900000)))
     } else {
       const errRes = await r.json()
       setError(errRes.error ?? 'Failed to generate report')
@@ -356,7 +375,7 @@ export default function ReportsPage() {
                   <p className="text-[#6c857f] font-semibold text-xs mt-2">Financial Report Statement</p>
                 </div>
                 <div className="text-right text-[9px] text-[#6c857f] space-y-1">
-                  <p><strong>Report No:</strong> #ET-{Math.floor(100000 + Math.random() * 900000)}</p>
+                  <p><strong>Report No:</strong> #ET-{reportNo}</p>
                   <p><strong>Date:</strong> {new Date().toLocaleDateString()}</p>
                   <p><strong>Period:</strong> {from} to {to}</p>
                 </div>
@@ -462,10 +481,10 @@ export default function ReportsPage() {
                 Generate
               </Button>
 
-              {result?.rows?.length > 0 && (
+              {(result?.rows?.length ?? 0) > 0 && (
                 <Button 
                   variant="outline" 
-                  onClick={() => downloadCSV(reportType, result.rows)}
+                  onClick={() => downloadCSV(reportType, result?.rows ?? [])}
                   className="flex-1 sm:flex-none border border-[#e4ebe8] hover:border-[#c19a3b] hover:bg-[#c19a3b]/5 text-[#c19a3b] font-bold rounded-xl h-11 px-5 text-xs transition-all duration-150 flex items-center justify-center gap-2"
                 >
                   <Download className="h-4 w-4" /> Export CSV

@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
+import { useCallback, useState } from 'react'
+import { useAsyncEffect } from '@/lib/hooks/use-async-effect'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Shield, Globe, Bell, Database, Save, Loader2, CheckCircle2, 
-  Download, Key, Info, HelpCircle, HardDrive, RefreshCw, Sparkles, Server
+  Download, Key, Info, Sparkles, Server
 } from 'lucide-react'
 
 type TabType = 'profile' | 'company' | 'notifications' | 'data'
@@ -38,8 +38,7 @@ export default function SettingsPage() {
   const [weeklySummaries, setWeeklySummaries] = useState(false)
   const [budgetWarnings, setBudgetWarnings] = useState(true)
 
-  async function loadSettings() {
-    setLoading(true)
+  const loadSettings = useCallback(async () => {
     setError(null)
     try {
       const res = await fetch('/api/settings')
@@ -58,16 +57,14 @@ export default function SettingsPage() {
         const err = await res.json()
         setError(err.error || 'Failed to load settings')
       }
-    } catch (e) {
+    } catch {
       setError('An unexpected error occurred while loading settings.')
     } finally {
       setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    loadSettings()
   }, [])
+
+  useAsyncEffect(loadSettings)
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -95,7 +92,7 @@ export default function SettingsPage() {
         const err = await res.json()
         setError(err.error || 'Failed to save settings')
       }
-    } catch (e) {
+    } catch {
       setError('An error occurred while saving.')
     } finally {
       setSaving(false)
@@ -113,7 +110,7 @@ export default function SettingsPage() {
           return
         }
         const keys = Object.keys(dataList[0])
-        const csv = [keys.join(','), ...dataList.map((r: any) => keys.map(k => JSON.stringify(r[k] ?? '')).join(','))].join('\n')
+        const csv = [keys.join(','), ...dataList.map((r: Record<string, unknown>) => keys.map(k => JSON.stringify(r[k] ?? '')).join(','))].join('\n')
         const blob = new Blob([csv], { type: 'text/csv' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
@@ -124,7 +121,7 @@ export default function SettingsPage() {
       } else {
         alert('Failed to export data')
       }
-    } catch (e) {
+    } catch {
       alert('An error occurred during export.')
     }
   }

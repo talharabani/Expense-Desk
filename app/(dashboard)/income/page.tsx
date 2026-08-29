@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useAsyncEffect } from '@/lib/hooks/use-async-effect'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -48,7 +49,7 @@ const EMPTY = {
   payment_method: 'bank', invoice_number: '', description: '', status: 'payment_pending',
 }
 
-function fmt(n: number, currency = 'PKR') {
+function fmt(n: number) {
   return new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n)
 }
 
@@ -63,17 +64,16 @@ export default function IncomePage() {
   const [form, setForm] = useState(EMPTY)
   const [submitting, setSubmitting] = useState(false)
 
-  async function load() {
-    setLoading(true)
+  const load = useCallback(async () => {
     const p = new URLSearchParams()
     if (statusFilter) p.set('status', statusFilter)
     const r = await fetch('/api/income?' + p)
     if (!r.ok) { setError('Failed to load'); setLoading(false); return }
     setIncome((await r.json()).data ?? [])
     setLoading(false)
-  }
+  }, [statusFilter])
 
-  useEffect(() => { load() }, [statusFilter])
+  useAsyncEffect(load)
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()

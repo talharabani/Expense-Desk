@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useAsyncEffect } from '@/lib/hooks/use-async-effect'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -77,17 +78,16 @@ export default function ExpensesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
 
-  async function load() {
-    setLoading(true)
+  const load = useCallback(async () => {
     const p = new URLSearchParams()
     if (statusFilter) p.set('status', statusFilter)
     const r = await fetch('/api/expenses?' + p)
     if (!r.ok) { setError('Failed to load'); setLoading(false); return }
     setExpenses((await r.json()).data ?? [])
     setLoading(false)
-  }
+  }, [statusFilter])
 
-  useEffect(() => { load() }, [statusFilter])
+  useAsyncEffect(load)
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()

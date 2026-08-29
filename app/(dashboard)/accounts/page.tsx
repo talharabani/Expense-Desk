@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useAsyncEffect } from '@/lib/hooks/use-async-effect'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,15 +35,14 @@ export default function AccountsPage() {
   const [form, setForm] = useState({ name: '', account_type: 'bank', currency: 'PKR', opening_balance: '0' })
   const [transfer, setTransfer] = useState({ fromId: '', toId: '', amount: '' })
 
-  async function load() {
-    setLoading(true)
+  const load = useCallback(async () => {
     const r = await fetch('/api/accounts')
     if (!r.ok) { setError('Failed to load accounts'); setLoading(false); return }
     setAccounts(await r.json())
     setLoading(false)
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useAsyncEffect(load)
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()

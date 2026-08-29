@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useAsyncEffect } from '@/lib/hooks/use-async-effect'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,16 +24,20 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [markingAll, setMarkingAll] = useState(false)
+  const [now, setNow] = useState(0)
 
-  async function load() {
-    setLoading(true)
+  const load = useCallback(async () => {
     const r = await fetch('/api/notifications')
-    if (r.ok) setNotifications(await r.json())
-    else setError('Failed to load notifications')
+    if (r.ok) {
+      setNotifications(await r.json())
+      // Snapshot the clock alongside the data so relative timestamps stay a
+      // pure function of state instead of reading Date.now() during render.
+      setNow(Date.now())
+    } else setError('Failed to load notifications')
     setLoading(false)
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useAsyncEffect(load)
 
   async function markAllRead() {
     setMarkingAll(true)
@@ -51,7 +56,8 @@ export default function NotificationsPage() {
   const unreadCount = notifications.filter(n => !n.is_read).length
 
   function timeAgo(dateStr: string) {
-    const diff = Date.now() - new Date(dateStr).getTime()
+    if (!now) return ''
+    const diff = now - new Date(dateStr).getTime()
     const mins = Math.floor(diff / 60000)
     if (mins < 1) return 'just now'
     if (mins < 60) return `${mins}m ago`

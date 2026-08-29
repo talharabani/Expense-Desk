@@ -1,17 +1,33 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useAsyncEffect } from '@/lib/hooks/use-async-effect'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import {
-  Loader2, DollarSign, TrendingDown, TrendingUp, CreditCard,
+  Loader2, CreditCard,
   Search, ArrowUpRight, ArrowDownRight, RefreshCw, Calendar, Tag, ChevronRight, Plus
 } from 'lucide-react'
+
+interface ApiRecord {
+  id: string
+  title: string
+  category?: string
+  amount?: number
+  currency?: string
+  status?: string
+  expense_date?: string
+  expenseDate?: string
+  payment_date?: string
+  paymentDate?: string
+  payment_method?: string
+  paymentMethod?: string
+}
 
 interface Transaction {
   id: string
@@ -66,9 +82,8 @@ export default function DashboardPage() {
   const [filterCategory, setFilterCategory] = useState('')
   const [filterDate, setFilterDate] = useState('')
 
-  async function loadDashboardData() {
+  const loadDashboardData = useCallback(async () => {
     try {
-      setLoading(true)
       const [expRes, incRes] = await Promise.all([
         fetch('/api/expenses'),
         fetch('/api/income'),
@@ -82,16 +97,16 @@ export default function DashboardPage() {
       if (expRes.ok) {
         const expData = await expRes.json()
         const list = expData.data ?? []
-        totalExpenses = list.reduce((sum: number, e: any) => sum + (e.amount || 0), 0)
-        pendingApprovals = list.filter((e: any) => e.status === 'submitted' || e.status === 'under_review').length
+        totalExpenses = list.reduce((sum: number, e: ApiRecord) => sum + (e.amount ?? 0), 0)
+        pendingApprovals = list.filter((e: ApiRecord) => e.status === 'submitted' || e.status === 'under_review').length
         
-        list.forEach((e: any) => {
+        list.forEach((e: ApiRecord) => {
           combinedList.push({
             id: e.id,
             title: e.title,
             category: e.category || 'miscellaneous',
-            amount: e.amount,
-            currency: e.currency,
+            amount: e.amount ?? 0,
+            currency: e.currency ?? 'PKR',
             date: e.expense_date || e.expenseDate || new Date().toISOString().slice(0, 10),
             type: 'expense',
             status: e.status || 'draft',
@@ -103,15 +118,15 @@ export default function DashboardPage() {
       if (incRes.ok) {
         const incData = await incRes.json()
         const list = incData.data ?? []
-        totalIncome = list.reduce((sum: number, i: any) => sum + (i.amount || 0), 0)
+        totalIncome = list.reduce((sum: number, i: ApiRecord) => sum + (i.amount ?? 0), 0)
 
-        list.forEach((i: any) => {
+        list.forEach((i: ApiRecord) => {
           combinedList.push({
             id: i.id,
             title: i.title,
             category: i.category || 'client_payment',
-            amount: i.amount,
-            currency: i.currency,
+            amount: i.amount ?? 0,
+            currency: i.currency ?? 'PKR',
             date: i.payment_date || i.paymentDate || new Date().toISOString().slice(0, 10),
             type: 'income',
             status: i.status || 'received',
@@ -130,16 +145,14 @@ export default function DashboardPage() {
         netBalance: totalIncome - totalExpenses,
         pendingApprovals,
       })
-    } catch (err) {
+    } catch {
       setError('Failed to load dashboard metrics')
     } finally {
       setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    loadDashboardData()
   }, [])
+
+  useAsyncEffect(loadDashboardData)
 
   // Filter implementation
   const filteredTransactions = transactions.filter(t => {

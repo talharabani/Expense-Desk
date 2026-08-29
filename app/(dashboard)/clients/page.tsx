@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useAsyncEffect } from '@/lib/hooks/use-async-effect'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Plus, Loader2, Search, Edit2, Trash2, XCircle, UserPlus } from 'lucide-react'
+import { Plus, Loader2, Search, Edit2, Trash2, XCircle } from 'lucide-react'
 
 interface Client {
   id: string
@@ -38,15 +39,14 @@ export default function ClientsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [search, setSearch] = useState('')
 
-  async function load() {
-    setLoading(true)
+  const load = useCallback(async () => {
     const r = await fetch('/api/clients' + (search ? `?search=${encodeURIComponent(search)}` : ''))
     if (r.ok) setClients(await r.json())
     else setError('Failed to load clients')
     setLoading(false)
-  }
+  }, [search])
 
-  useEffect(() => { load() }, [search])
+  useAsyncEffect(load)
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -66,7 +66,7 @@ export default function ClientsPage() {
         const err = await r.json()
         setError(err.error || 'Failed to create client')
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred during creation.')
     } finally {
       setSubmitting(false)
@@ -92,7 +92,7 @@ export default function ClientsPage() {
         const err = await r.json()
         setError(err.error || 'Failed to update client details')
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred during save.')
     } finally {
       setSubmitting(false)
@@ -114,7 +114,7 @@ export default function ClientsPage() {
         const err = await r.json()
         setError(err.error || 'Failed to delete client')
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred during deletion.')
     } finally {
       setSubmitting(false)
@@ -337,7 +337,7 @@ export default function ClientsPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm border border-gray-100 overflow-hidden p-6 space-y-4">
             <h3 className="text-lg font-bold text-gray-900">Delete Client Account?</h3>
             <p className="text-sm text-gray-400">
-              Are you sure you want to delete <span className="font-semibold text-gray-900">"{deletingClient.name}"</span>? This will remove all database connections and references linked to this client.
+              Are you sure you want to delete <span className="font-semibold text-gray-900">&ldquo;{deletingClient.name}&rdquo;</span>? This will remove all database connections and references linked to this client.
             </p>
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setDeletingClient(null)}>Cancel</Button>

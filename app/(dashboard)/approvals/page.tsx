@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useAsyncEffect } from '@/lib/hooks/use-async-effect'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,16 +30,15 @@ export default function ApprovalsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [commentMap, setCommentMap] = useState<Record<string, string>>({})
 
-  async function load() {
-    setLoading(true)
+  const load = useCallback(async () => {
     const r = await fetch('/api/expenses?status=submitted')
     if (!r.ok) { setError('Failed to load pending approvals'); setLoading(false); return }
     const data = await r.json()
     setExpenses(data.data ?? [])
     setLoading(false)
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useAsyncEffect(load)
 
   async function act(expenseId: string, action: string) {
     setActionLoading(expenseId + action)

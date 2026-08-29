@@ -4,7 +4,7 @@ A comprehensive financial management system for companies, providing income trac
 
 ## Tech Stack
 
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **UI Components**: Shadcn UI
@@ -19,15 +19,18 @@ expense-tracker/
 ├── components/                 # React components
 │   └── ui/                     # Shadcn UI primitives
 ├── lib/                        # Utility libraries
+│   ├── hooks/                 # Shared client hooks
+│   │   └── use-async-effect.ts
 │   ├── supabase/              # Supabase client configuration
 │   │   ├── client.ts          # Browser client
-│   │   ├── server.ts          # Server client
-│   │   └── middleware.ts      # Middleware for auth
+│   │   ├── env.ts             # Env var reading/validation
+│   │   └── server.ts          # Server client
 │   └── utils.ts               # General utilities
 ├── types/                     # TypeScript type definitions
 │   └── index.ts               # All shared types
 ├── tests/                     # Test files
 │   └── setup.ts               # Global test setup
+├── proxy.ts                   # Auth session refresh (Next.js proxy convention)
 ├── .env.local                 # Environment variables (local)
 ├── .env.local.example         # Environment variables template
 ├── vitest.config.ts           # Vitest configuration
@@ -76,7 +79,8 @@ expense-tracker/
 ## Available Scripts
 
 - `npm run dev` - Start development server
-- `npm run build` - Build for production
+- `npm run build` - Build for production (Turbopack)
+- `npm run build:webpack` - Build for production with webpack (fallback when Turbopack cannot spawn workers locally)
 - `npm start` - Start production server
 - `npm run lint` - Run ESLint
 - `npm test` - Run tests in watch mode

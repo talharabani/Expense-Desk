@@ -197,6 +197,30 @@ export async function processApproval(
     entityType: 'expense',
     entityId: expenseId,
   })
+
+  // A forward hands the expense to a named colleague. The status stays put so
+  // the expense remains in the approval queue; the new approver is told about it.
+  if (action === 'forwarded' && forwardToUserId) {
+    const { data: target } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', forwardToUserId)
+      .eq('company_id', companyId)
+      .eq('is_active', true)
+      .single()
+
+    if (!target) throw new Error('Cannot forward to an unknown user')
+
+    await createNotification({
+      userId: target.id,
+      companyId,
+      type: 'expense_forwarded',
+      title: 'Expense forwarded to you',
+      message: `An expense "${expense.title}" was forwarded to you for approval.${comment ? ` Comment: ${comment}` : ''}`,
+      entityType: 'expense',
+      entityId: expenseId,
+    })
+  }
 }
 
 export async function markExpensePaid(

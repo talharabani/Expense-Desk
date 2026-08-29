@@ -45,8 +45,8 @@ export async function uploadDocument(
         allowedMimeTypes: ALLOWED_TYPES,
         fileSizeLimit: MAX_FILE_SIZE,
       })
-    } catch (e) {
-      // Ignore conflict or permissions errors
+    } catch {
+      // Bucket already exists, or the key lacks permission to create it.
     }
   }
 

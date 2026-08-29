@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useAsyncEffect } from '@/lib/hooks/use-async-effect'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -11,8 +12,8 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   ArrowLeft, Pencil, Trash2, Loader2,
-  CheckCircle2, XCircle, Check, X,
-  Calendar, CreditCard, Hash, FileText, TrendingUp, Clock,
+  Check, X,
+  Calendar, CreditCard, Hash, FileText,
 } from 'lucide-react'
 
 interface Income {
@@ -69,8 +70,7 @@ export default function IncomeDetailPage() {
     invoice_number: '', description: '', status: 'payment_pending',
   })
 
-  async function load() {
-    setLoading(true)
+  const load = useCallback(async () => {
     const r = await fetch(`/api/income/${id}`)
     if (r.ok) {
       const d = await r.json()
@@ -84,9 +84,9 @@ export default function IncomeDetailPage() {
       })
     } else { setError('Income record not found') }
     setLoading(false)
-  }
+  }, [id])
 
-  useEffect(() => { load() }, [id])
+  useAsyncEffect(load)
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()

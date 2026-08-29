@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useAsyncEffect } from '@/lib/hooks/use-async-effect'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -51,8 +52,7 @@ export default function AuditLogsPage() {
   const [page, setPage] = useState(0)
   const limit = 50
 
-  async function load() {
-    setLoading(true)
+  const load = useCallback(async () => {
     const params = new URLSearchParams({ limit: String(limit), offset: String(page * limit) })
     if (entityType) params.set('entityType', entityType)
     if (from) params.set('from', from)
@@ -64,9 +64,9 @@ export default function AuditLogsPage() {
       setTotal(data.total ?? 0)
     } else setError('Failed to load audit logs')
     setLoading(false)
-  }
+  }, [entityType, from, to, page])
 
-  useEffect(() => { load() }, [entityType, from, to, page])
+  useAsyncEffect(load)
 
   // Count summaries
   const totalCreations = logs.filter(l => l.action === 'created').length

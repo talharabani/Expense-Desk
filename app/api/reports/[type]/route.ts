@@ -3,6 +3,27 @@ import { getAuthUser } from '@/lib/auth/server'
 import { hasPermission } from '@/lib/auth/permissions'
 import { requireSupabaseClient } from '@/lib/auth/server'
 
+type LedgerRow = {
+  date: string
+  title: string
+  type: 'Income' | 'Expense'
+  category: string
+  amount: number | null
+  currency: string | null
+  converted_amount: number | null
+}
+
+type CashFlowRow = {
+  date: string
+  title: string
+  flow_direction: 'Inflow (+)' | 'Outflow (-)'
+  category: string | null
+  amount: number | null
+  currency: string | null
+  converted_amount: number | null
+  payment_method: string
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ type: string }> }
@@ -51,7 +72,7 @@ export async function GET(
       const profitMargin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0
 
       // Formulate rows for detailed breakdown
-      const rows: any[] = []
+      const rows: LedgerRow[] = []
       
       // Add Income records to rows
       incomeData?.forEach(i => {
@@ -141,7 +162,7 @@ export async function GET(
         .lte('expense_date', to)
         .in('status', ['approved', 'paid'])
 
-      const rows: any[] = []
+      const rows: CashFlowRow[] = []
       let totalInflow = 0
       let totalOutflow = 0
 

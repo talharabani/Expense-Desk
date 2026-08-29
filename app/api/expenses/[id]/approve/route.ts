@@ -38,6 +38,9 @@ export async function POST(
     if (message.startsWith('Insufficient role') || message.startsWith('Cannot approve your own')) {
       return NextResponse.json({ error: message }, { status: 403 })
     }
+    if (message.startsWith('Cannot forward to an unknown user')) {
+      return NextResponse.json({ error: message }, { status: 422 })
+    }
     if (message.startsWith('Cannot approve expense without')) {
       return NextResponse.json({ error: message }, { status: 422 })
     }

@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useAsyncEffect } from '@/lib/hooks/use-async-effect'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,8 +48,7 @@ export default function ProjectsPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
 
-  async function load() {
-    setLoading(true)
+  const load = useCallback(async () => {
     try {
       const pRes = await fetch('/api/projects')
       if (pRes.ok) {
@@ -61,14 +61,14 @@ export default function ProjectsPage() {
       if (cRes.ok) {
         setClients(await cRes.json())
       }
-    } catch (e) {
+    } catch {
       setError('An error occurred during load.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useAsyncEffect(load)
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -91,7 +91,7 @@ export default function ProjectsPage() {
         const err = await r.json()
         setError(err.error || 'Failed to create project')
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred.')
     } finally {
       setSubmitting(false)
@@ -120,7 +120,7 @@ export default function ProjectsPage() {
         const err = await r.json()
         setError(err.error || 'Failed to save changes')
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred.')
     } finally {
       setSubmitting(false)
@@ -142,7 +142,7 @@ export default function ProjectsPage() {
         const err = await r.json()
         setError(err.error || 'Failed to delete project')
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred.')
     } finally {
       setSubmitting(false)
@@ -195,6 +195,9 @@ export default function ProjectsPage() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Revenue</span>
           <p className="text-2xl font-extrabold text-emerald-600 mt-2">PKR {totalRevenue.toLocaleString()}</p>
+          <p className={`text-[11px] font-semibold mt-1 ${totalProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            Net PKR {totalProfit.toLocaleString()}
+          </p>
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Avg. Profit Margin</span>
@@ -406,7 +409,7 @@ export default function ProjectsPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm border border-gray-100 overflow-hidden p-6 space-y-4">
             <h3 className="text-lg font-bold text-gray-900">Delete Project?</h3>
             <p className="text-sm text-gray-400">
-              Are you sure you want to delete <span className="font-semibold text-gray-900">"{deletingProject.name}"</span>? This action is permanent and will delete all project records.
+              Are you sure you want to delete <span className="font-semibold text-gray-900">&ldquo;{deletingProject.name}&rdquo;</span>? This action is permanent and will delete all project records.
             </p>
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setDeletingProject(null)}>Cancel</Button>

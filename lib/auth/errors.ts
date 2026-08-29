@@ -46,6 +46,25 @@ export function describeAuthError(error: RawAuthError): FriendlyAuthError {
     }
   }
 
+  // A PKCE exchange needs the code_verifier cookie that the browser stored when
+  // the sign-up started. Opening the link in a different browser or device — the
+  // normal case when someone registers on a laptop and reads mail on a phone —
+  // means the cookie is absent. Supabase has already confirmed the address by
+  // this point; only the automatic sign-in is lost, so say that rather than
+  // showing the SDK's note to developers about @supabase/ssr.
+  if (
+    code === 'flow_state_not_found' ||
+    code === 'flow_state_expired' ||
+    code === 'bad_code_verifier' ||
+    /code verifier/i.test(raw)
+  ) {
+    return {
+      message:
+        'Your email is confirmed. Sign in below — we could not sign you in automatically because the link was opened in a different browser from the one you registered in.',
+      action: 'sign_in',
+    }
+  }
+
   if (code === 'otp_expired' || code === 'validation_failed') {
     return {
       message:

@@ -155,7 +155,9 @@ The sender address must be one the provider has verified — a domain you own, o
 
 **2. The link must point at this app.** `signUp` sends `emailRedirectTo` pointing at `/auth/confirm`, which is a route handler in this repo: it verifies the token, sets the session cookie, and forwards to `/setup`. A failed or expired link lands on `/login` carrying the reason.
 
-**3. The template must carry a token the server can read.** The default template uses `{{ .ConfirmationURL }}`, which works. The more robust form — verified server-side, so the session exists before anything renders — is to edit **Authentication → Emails → Confirm signup** and use:
+**3. The template must carry a token the server can read.** The default `{{ .ConfirmationURL }}` template sends a PKCE `code`, which can only be exchanged in the *same browser* that started the sign-up — the verifier is stored in a cookie there. Someone who registers on a laptop and opens the mail on their phone gets confirmed but not signed in, and lands on the sign-in page instead.
+
+Switching the template to `{{ .TokenHash }}` removes that constraint entirely: the token is verified server-side, needs no cookie, and works from any browser or device. **This is the recommended setting.** Edit **Authentication → Emails → Confirm signup** and use:
 
 ```html
 <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/setup">

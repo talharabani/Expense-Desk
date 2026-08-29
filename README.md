@@ -43,7 +43,7 @@ expense-tracker/
 
 ### Prerequisites
 
-- Node.js 20+ 
+- Node.js 22+ (24.x verified; @supabase/* requires >=22)
 - npm
 - A Supabase project (for backend services)
 

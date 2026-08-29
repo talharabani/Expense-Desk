@@ -9,7 +9,7 @@ Nothing here assumes prior state. Follow it top to bottom once.
 
 | Tool | Version | Check |
 |---|---|---|
-| Node.js | 20+ (24.x verified) | `node -v` |
+| Node.js | **22+** (24.x verified) — `@supabase/*` requires >=22 | `node -v` |
 | npm | 10+ | `npm -v` |
 | Git | any | `git --version` |
 | Supabase account | free tier is enough | https://supabase.com |

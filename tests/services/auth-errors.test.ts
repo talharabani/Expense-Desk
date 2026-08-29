@@ -34,6 +34,23 @@ describe('describeAuthError', () => {
     }
   })
 
+  it('reassures rather than alarms when the PKCE verifier is missing', () => {
+    for (const code of ['flow_state_not_found', 'flow_state_expired', 'bad_code_verifier']) {
+      const result = describeAuthError({ code })
+      expect(result.message).toMatch(/your email is confirmed/i)
+      expect(result.action).toBe('sign_in')
+    }
+  })
+
+  it('recognises the verifier failure from its message when no code is given', () => {
+    const result = describeAuthError({
+      message:
+        'PKCE code verifier not found in storage. This can happen if the auth flow was initiated in a different browser or device.',
+    })
+    expect(result.message).toMatch(/your email is confirmed/i)
+    expect(result.message).not.toMatch(/@supabase\/ssr|SvelteKit/)
+  })
+
   it('offers a resend when the confirmation link is dead', () => {
     for (const code of ['otp_expired', 'validation_failed']) {
       const result = describeAuthError({ code })

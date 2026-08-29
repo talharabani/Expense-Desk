@@ -31,8 +31,13 @@ jobs:
           node-version: 24
           cache: npm
 
+      # Should be `npm ci`, which is faster and enforces the lockfile. It fails
+      # today because package-lock.json was generated on Windows and omits
+      # @emnapi/core and @emnapi/runtime — transitive deps that npm only
+      # resolves on Linux. Regenerate the lockfile once on Linux (WSL, a
+      # container, or a Codespace) and this can go back to `npm ci`.
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Lint
         run: npm run lint

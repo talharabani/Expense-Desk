@@ -129,13 +129,43 @@ Files are never served publicly — the app issues 1-hour signed URLs.
 
 Dashboard → **Authentication → Sign In / Providers → Email**:
 
-- **Local development:** turn *Confirm email* **off**. Registration then returns a session immediately and you land straight in the app.
-- **Production:** leave *Confirm email* **on**.
+- *Confirm email* **off** — registration returns a session immediately and you land straight in the app. No mail server needed. Fine for development; it also means anyone who can reach the app can create an account.
+- *Confirm email* **on** — the account cannot sign in until the emailed link is clicked. This is the right setting for production, but it only works if mail is actually delivered: see §2e.
 
 Dashboard → **Authentication → URL Configuration**:
 
 - Site URL: `http://localhost:3000` for dev, your Vercel domain for production.
-- Redirect URLs: add both `http://localhost:3000/**` and `https://<your-app>.vercel.app/**`.
+- Redirect URLs — the confirmation link is refused if its target is not listed here. Add all of:
+  - `http://localhost:3000/**`
+  - `https://<your-app>.vercel.app/**`
+
+### 2e. Email confirmation that actually arrives
+
+Keeping *Confirm email* on needs three things. Miss any one and registration ends at a "check your email" screen for a message that never comes, or a link that goes nowhere.
+
+**1. A real mail sender.** Supabase's built-in service is for testing only: a few messages per hour, and on current projects it will only deliver to addresses belonging to project members. Every other address is silently dropped. Configure your own under **Project Settings → Authentication → SMTP Settings**:
+
+| Provider | Free tier | Host |
+|---|---|---|
+| Resend | 3,000/month | `smtp.resend.com:465` |
+| Brevo | 300/day | `smtp-relay.brevo.com:587` |
+| SendGrid | 100/day | `smtp.sendgrid.net:587` |
+
+The sender address must be one the provider has verified — a domain you own, or the provider's sandbox sender. Raise **Rate limit for sending emails** under **Authentication → Rate Limits** afterwards; it stays at the built-in value until you do.
+
+**2. The link must point at this app.** `signUp` sends `emailRedirectTo` pointing at `/auth/confirm`, which is a route handler in this repo: it verifies the token, sets the session cookie, and forwards to `/setup`. A failed or expired link lands on `/login` carrying the reason.
+
+**3. The template must carry a token the server can read.** The default template uses `{{ .ConfirmationURL }}`, which works. The more robust form — verified server-side, so the session exists before anything renders — is to edit **Authentication → Emails → Confirm signup** and use:
+
+```html
+<a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/setup">
+  Confirm your email
+</a>
+```
+
+`/auth/confirm` accepts both shapes, so either template works.
+
+**Verifying it end to end:** register with a real address, confirm the message arrives, click the link, and check you land on `/setup` already signed in. If the link errors, the message on `/login` says why — an expired or already-used link offers to send a new one.
 
 ### 2d. Copy your keys
 
@@ -243,6 +273,8 @@ Testing is dual: Vitest unit tests plus `fast-check` property-based tests (minim
 | `ERR_NAME_NOT_RESOLVED` on `placeholder.supabase.co` | Env vars missing or invalid at build time | Read the `Supabase is NOT configured` server log — it names the failing check. Fix `.env.local`, restart the dev server |
 | `String contains non ISO-8859-1 code point` | Smart quote / ellipsis / zero-width char pasted into a key | Re-copy the key with the dashboard's copy button |
 | `Service role key not configured` on `/setup` | `SUPABASE_SERVICE_ROLE_KEY` missing or still a placeholder | Add the real key to `.env.local`, restart |
+| Registered, but no confirmation email arrives | Supabase's built-in mailer only delivers to project members and is rate limited | Configure your own SMTP (§2e) |
+| Confirmation link errors or does nothing | The target is not in **Redirect URLs**, or the link expired | Add the URL patterns in §2c; use the resend option offered on /login |
 | Signed up but no data anywhere | `/setup` never completed | Visit `/setup` and finish the company bootstrap |
 | `Profile already exists` (409) | Setup ran twice | Expected — go to `/dashboard` |
 | Empty tables or permission errors | `run_all.sql` not run, or RLS blocking a user with no `users` row | Re-run `run_all.sql`; confirm your `users` row exists with the right `company_id` |

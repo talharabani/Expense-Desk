@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { describeAuthError } from '@/lib/auth/errors'
@@ -18,7 +18,7 @@ const isConfigured =
   SUPABASE_URL !== 'your-supabase-url' &&
   !SUPABASE_URL.includes('placeholder')
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
 
   const [email, setEmail] = useState('')
@@ -30,6 +30,13 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [canResend, setCanResend] = useState(false)
   const [resent, setResent] = useState(false)
+
+  // The confirmation route reports a dead or already-used link by redirecting
+  // here with ?error=. Derive it during render rather than pushing it into
+  // state from an effect, which would cascade an extra render.
+  const linkError = useSearchParams().get('error')
+  const shownError = error ?? linkError
+  const showResend = canResend || (!!linkError && /confirm|expired/i.test(linkError))
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -66,7 +73,11 @@ export default function LoginPage() {
 
   async function handleResend() {
     const supabase = createClient()
-    const { error: resendError } = await supabase.auth.resend({ type: 'signup', email })
+    const { error: resendError } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/confirm?next=/setup` },
+    })
     if (resendError) {
       setError(describeAuthError(resendError).message)
       return
@@ -144,11 +155,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key`}</pre>
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {error && (
+            {shownError && (
               <Alert variant="destructive" className="mb-4">
                 <AlertDescription>
-                  {error}
-                  {canResend && (
+                  {shownError}
+                  {showResend && (
                     <button
                       type="button"
                       onClick={handleResend}
@@ -231,5 +242,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key`}</pre>
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  // useSearchParams needs a Suspense boundary so the shell can still prerender.
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   )
 }

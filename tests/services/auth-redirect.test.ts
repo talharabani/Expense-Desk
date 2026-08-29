@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from 'vitest'
 import fc from 'fast-check'
-import { safeNextPath } from '@/lib/auth/redirect'
+import { safeNextPath, needsConfirmRedirect } from '@/lib/auth/redirect'
 
 describe('safeNextPath', () => {
   it('keeps a normal in-app path', () => {
@@ -66,5 +66,30 @@ describe('safeNextPath', () => {
       }),
       { numRuns: 500 }
     )
+  })
+})
+
+describe('needsConfirmRedirect', () => {
+  const params = (query: string) => new URLSearchParams(query)
+
+  it('claims a token landing on the site root, which would otherwise be discarded', () => {
+    expect(needsConfirmRedirect('/', params('code=abc'))).toBe(true)
+    expect(needsConfirmRedirect('/', params('token_hash=abc&type=email'))).toBe(true)
+  })
+
+  it('claims an error landing on the site root, so the reason is shown', () => {
+    expect(needsConfirmRedirect('/', params('error=access_denied'))).toBe(true)
+    expect(needsConfirmRedirect('/', params('error_description=expired'))).toBe(true)
+  })
+
+  it('leaves a plain visit to the root alone', () => {
+    expect(needsConfirmRedirect('/', params(''))).toBe(false)
+    expect(needsConfirmRedirect('/', params('utm_source=email'))).toBe(false)
+  })
+
+  it('leaves other routes alone, in case they use a code parameter of their own', () => {
+    expect(needsConfirmRedirect('/dashboard', params('code=abc'))).toBe(false)
+    expect(needsConfirmRedirect('/expenses', params('code=abc'))).toBe(false)
+    expect(needsConfirmRedirect('/auth/confirm', params('code=abc'))).toBe(false)
   })
 })

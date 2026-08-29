@@ -9,6 +9,26 @@
 
 const DEFAULT_NEXT = '/setup'
 
+/** Query parameters that mean "this request is an auth callback". */
+const AUTH_CALLBACK_PARAMS = ['code', 'token_hash', 'error', 'error_description'] as const
+
+export const CONFIRM_PATH = '/auth/confirm'
+
+/**
+ * True when a request landing on `pathname` is carrying an auth token that the
+ * page there would discard.
+ *
+ * Supabase's default email template sends people to the project's Site URL —
+ * the site root — with the token on the query string. The root route redirects
+ * straight to /dashboard, so the token is lost and the link appears to do
+ * nothing. Only the root is treated this way: other routes are left alone, in
+ * case they use a `code` parameter of their own.
+ */
+export function needsConfirmRedirect(pathname: string, params: URLSearchParams): boolean {
+  if (pathname !== '/') return false
+  return AUTH_CALLBACK_PARAMS.some((name) => params.has(name))
+}
+
 export function safeNextPath(raw: string | null | undefined, fallback = DEFAULT_NEXT): string {
   if (!raw) return fallback
 

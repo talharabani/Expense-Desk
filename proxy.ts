@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { readSupabaseEnv } from '@/lib/supabase/env'
+import { needsConfirmRedirect, CONFIRM_PATH } from '@/lib/auth/redirect'
 
 // Hard ceiling for the Supabase auth round-trip. Vercel kills the proxy at 25s;
 // staying well under that means a slow/unreachable Supabase degrades to
@@ -9,6 +10,16 @@ const AUTH_TIMEOUT_MS = 5000
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
+
+  // A confirmation link built from Supabase's default template lands on the
+  // project's Site URL — the site root — carrying the token as a query
+  // parameter. The root route redirects to /dashboard without reading it, so
+  // the link silently does nothing. Hand it to the confirm handler instead.
+  if (needsConfirmRedirect(request.nextUrl.pathname, request.nextUrl.searchParams)) {
+    const target = request.nextUrl.clone()
+    target.pathname = CONFIRM_PATH
+    return NextResponse.redirect(target)
+  }
 
   // Skip middleware if env vars aren't configured yet, or if they carry paste
   // damage that would make the auth header invalid.

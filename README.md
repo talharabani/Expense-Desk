@@ -39,6 +39,8 @@ expense-tracker/
 
 ## Getting Started
 
+> Full end-to-end setup (folders, Supabase project, storage bucket, env vars, first run, Vercel deploy, troubleshooting): **[SETUP.md](SETUP.md)**. The quick version follows.
+
 ### Prerequisites
 
 - Node.js 20+ 

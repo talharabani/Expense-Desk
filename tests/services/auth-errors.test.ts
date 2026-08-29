@@ -34,6 +34,14 @@ describe('describeAuthError', () => {
     }
   })
 
+  it('offers a resend when the confirmation link is dead', () => {
+    for (const code of ['otp_expired', 'validation_failed']) {
+      const result = describeAuthError({ code })
+      expect(result.action).toBe('resend_confirmation')
+      expect(result.message).toMatch(/expired or has already been used/i)
+    }
+  })
+
   it('asks the user to wait when rate limited', () => {
     for (const code of ['over_email_send_rate_limit', 'over_request_rate_limit']) {
       expect(describeAuthError({ code }).message).toMatch(/too many attempts/i)

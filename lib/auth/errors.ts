@@ -46,6 +46,14 @@ export function describeAuthError(error: RawAuthError): FriendlyAuthError {
     }
   }
 
+  if (code === 'otp_expired' || code === 'validation_failed') {
+    return {
+      message:
+        'That confirmation link has expired or has already been used. Send yourself a new one.',
+      action: 'resend_confirmation',
+    }
+  }
+
   if (code === 'over_email_send_rate_limit' || code === 'over_request_rate_limit') {
     return {
       message: 'Too many attempts. Wait a minute and try again.',

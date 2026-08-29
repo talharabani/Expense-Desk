@@ -55,6 +55,10 @@ export default function RegisterPage() {
       password,
       options: {
         data: { name },
+        // Without this the confirmation link goes to the project's Site URL,
+        // which has no handler for the token. Send it to the route that turns
+        // the token into a session, then on to company setup.
+        emailRedirectTo: `${window.location.origin}/auth/confirm?next=/setup`,
       },
     })
 
@@ -93,7 +97,11 @@ export default function RegisterPage() {
 
   async function handleResend() {
     const supabase = createClient()
-    const { error: resendError } = await supabase.auth.resend({ type: 'signup', email })
+    const { error: resendError } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/confirm?next=/setup` },
+    })
     if (resendError) {
       setError(describeAuthError(resendError).message)
       return

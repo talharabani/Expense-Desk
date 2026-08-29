@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { describeAuthError } from '@/lib/auth/errors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,6 +28,8 @@ export default function LoginPage() {
   const [factorId, setFactorId] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [canResend, setCanResend] = useState(false)
+  const [resent, setResent] = useState(false)
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -38,7 +41,9 @@ export default function LoginPage() {
     const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
 
     if (signInError) {
-      setError(signInError.message)
+      const friendly = describeAuthError(signInError)
+      setError(friendly.message)
+      setCanResend(friendly.action === 'resend_confirmation')
       setLoading(false)
       return
     }
@@ -57,6 +62,16 @@ export default function LoginPage() {
 
     router.push('/dashboard')
     router.refresh()
+  }
+
+  async function handleResend() {
+    const supabase = createClient()
+    const { error: resendError } = await supabase.auth.resend({ type: 'signup', email })
+    if (resendError) {
+      setError(describeAuthError(resendError).message)
+      return
+    }
+    setResent(true)
   }
 
   async function handleTOTPVerify(e: React.FormEvent<HTMLFormElement>) {
@@ -131,7 +146,19 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key`}</pre>
           <CardContent>
             {error && (
               <Alert variant="destructive" className="mb-4">
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>
+                  {error}
+                  {canResend && (
+                    <button
+                      type="button"
+                      onClick={handleResend}
+                      disabled={resent}
+                      className="mt-2 block font-semibold underline disabled:no-underline disabled:opacity-70"
+                    >
+                      {resent ? 'Confirmation link sent' : 'Resend confirmation link'}
+                    </button>
+                  )}
+                </AlertDescription>
               </Alert>
             )}
 

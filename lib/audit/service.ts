@@ -1,38 +1,17 @@
 import { requireSupabaseClient } from '@/lib/auth/server'
+import { buildAuditRow, type AuditableOperation } from '@/lib/audit/utils'
 
-interface AuditLogEntry {
-  userId: string
-  companyId: string
-  entityType: string
-  entityId: string
-  action: string
-  previousValue?: Record<string, unknown>
-  newValue?: Record<string, unknown>
-  ipAddress?: string
-  deviceInfo?: string
-}
+type AuditLogEntry = AuditableOperation
 
 /**
  * Writes a single audit log entry. Fails silently to avoid disrupting
  * the primary operation — audit failures are logged to console.
- * Uses 'updated' for any non-standard action to avoid DB constraint violations.
+ * Row shape and action normalization live in lib/audit/utils.
  */
 export async function writeAuditLog(entry: AuditLogEntry): Promise<void> {
   try {
     const supabase = await requireSupabaseClient()
-    const VALID_ACTIONS = ['created', 'updated', 'deleted', 'approved', 'rejected']
-    const action = VALID_ACTIONS.includes(entry.action) ? entry.action : 'updated'
-    await supabase.from('audit_logs').insert({
-      company_id: entry.companyId,
-      user_id: entry.userId,
-      entity_type: entry.entityType,
-      entity_id: entry.entityId ?? entry.userId,
-      action,
-      previous_value: entry.previousValue ?? null,
-      new_value: entry.newValue ?? null,
-      ip_address: entry.ipAddress ?? null,
-      device_info: entry.deviceInfo ?? null,
-    })
+    await supabase.from('audit_logs').insert(buildAuditRow(entry))
   } catch (err) {
     console.error('[AuditLog] Failed to write audit entry:', err)
   }

@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/auth/server'
 import { hasPermission } from '@/lib/auth/permissions'
 import { requireSupabaseClient } from '@/lib/auth/server'
 import { writeAuditLog } from '@/lib/audit/service'
+import { calculateVendorTotals } from '@/lib/vendors/utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,7 +26,22 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query
     if (error) throw new Error(error.message)
-    return NextResponse.json(data)
+
+    // vendors.total_paid is written as 0 on creation and never incremented, so
+    // derive it from the paid expenses instead of returning the stale column.
+    const { data: paidExpenses } = await supabase
+      .from('expenses')
+      .select('vendor_id, status, converted_amount, deleted_at')
+      .eq('company_id', user.companyId)
+      .eq('status', 'paid')
+
+    const totals = calculateVendorTotals(paidExpenses ?? [])
+    const enriched = (data ?? []).map((vendor: { id: string; [key: string]: unknown }) => ({
+      ...vendor,
+      total_paid: totals[vendor.id] ?? 0,
+    }))
+
+    return NextResponse.json(enriched)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     if (message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

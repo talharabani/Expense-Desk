@@ -13,6 +13,19 @@ import { calculateProjectProfitability } from '@/lib/projects/utils'
 import { calculateBudgetUtilization, getCrossedThresholds } from '@/lib/budgets/utils'
 import { getApprovalThreshold, hasPermission, getApprovalPermission } from '@/lib/auth/permissions'
 import { getRoleRank, roleAtLeast, ROLE_HIERARCHY, type Role } from '@/types'
+import {
+  buildAuditRow,
+  buildAuditRows,
+  normalizeAuditAction,
+  VALID_AUDIT_ACTIONS,
+  AUDITED_ENTITY_TYPES,
+} from '@/lib/audit/utils'
+import {
+  flagRenewalWindow,
+  getSubscriptionsDueForAlert,
+  daysUntil,
+} from '@/lib/subscriptions/utils'
+import { calculateVendorTotalPaid, calculateVendorTotals } from '@/lib/vendors/utils'
 
 // ---------------------------------------------------------------------------
 // Generators
@@ -56,6 +69,43 @@ const genAccountBalances = () =>
   fc.record({
     balance: genNonNegativeAmount,
     amount: genPositiveAmount,
+  })
+
+// Fixed reference day for the renewal-window properties (Property 14).
+const TODAY = '2026-06-15T00:00:00Z'
+
+/** ISO date `offset` whole days from TODAY. */
+const dayOffset = (offset: number): string => {
+  const base = new Date(TODAY)
+  base.setUTCDate(base.getUTCDate() + offset)
+  return base.toISOString().slice(0, 10)
+}
+
+const baseOperation = {
+  userId: 'user-1',
+  companyId: 'company-1',
+  entityType: 'expense',
+  entityId: 'entity-1',
+  action: 'created',
+}
+
+const genAuditOperation = () =>
+  fc.record({
+    userId: fc.uuid(),
+    companyId: fc.uuid(),
+    entityType: fc.constantFrom(...AUDITED_ENTITY_TYPES),
+    entityId: fc.uuid(),
+    action: fc.constantFrom('created', 'updated', 'deleted', 'approved', 'rejected'),
+  })
+
+const VENDOR_IDS = ['vendor-a', 'vendor-b', 'vendor-c'] as const
+
+const genVendorExpense = () =>
+  fc.record({
+    vendor_id: fc.constantFrom<string | null>(...VENDOR_IDS, null),
+    status: fc.constantFrom('draft', 'submitted', 'approved', 'rejected', 'paid'),
+    converted_amount: genNonNegativeAmount,
+    deleted_at: fc.constantFrom<string | null>(null, null, null, '2026-01-01T00:00:00Z'),
   })
 
 // ---------------------------------------------------------------------------
@@ -356,6 +406,86 @@ describe('Property 11: Partial income payment sum invariant', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Property 12: Audit log completeness
+// Every create/update/delete on a financial record produces exactly one audit entry.
+// Validates: Requirements 18.1, 18.2
+// ---------------------------------------------------------------------------
+describe('Property 12: Audit log completeness', () => {
+  it('every create/update/delete operation produces exactly one audit row', () => {
+    fc.assert(
+      fc.property(fc.array(genAuditOperation(), { minLength: 1, maxLength: 30 }), (operations) => {
+        const rows = buildAuditRows(operations)
+        expect(rows).toHaveLength(operations.length)
+      }),
+      { numRuns: 100 }
+    )
+  })
+
+  it('each row captures the operation it came from', () => {
+    fc.assert(
+      fc.property(fc.array(genAuditOperation(), { minLength: 1, maxLength: 20 }), (operations) => {
+        const rows = buildAuditRows(operations)
+        operations.forEach((op, i) => {
+          expect(rows[i].company_id).toBe(op.companyId)
+          expect(rows[i].user_id).toBe(op.userId)
+          expect(rows[i].entity_type).toBe(op.entityType)
+          expect(rows[i].entity_id).toBe(op.entityId || op.userId)
+        })
+      }),
+      { numRuns: 100 }
+    )
+  })
+
+  it('the recorded action is always one the DB constraint accepts', () => {
+    fc.assert(
+      fc.property(
+        genAuditOperation(),
+        fc.string(),
+        (operation, arbitraryAction) => {
+          const row = buildAuditRow({ ...operation, action: arbitraryAction })
+          expect(VALID_AUDIT_ACTIONS).toContain(row.action)
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  it('a known action is preserved verbatim, an unknown one becomes updated', () => {
+    fc.assert(
+      fc.property(fc.constantFrom(...VALID_AUDIT_ACTIONS), (action) => {
+        expect(normalizeAuditAction(action)).toBe(action)
+      }),
+      { numRuns: 50 }
+    )
+    fc.assert(
+      fc.property(
+        fc.string().filter((s) => !(VALID_AUDIT_ACTIONS as readonly string[]).includes(s)),
+        (action) => {
+          expect(normalizeAuditAction(action)).toBe('updated')
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  it('a mutation on any audited financial entity is never dropped', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...AUDITED_ENTITY_TYPES),
+        fc.constantFrom('created', 'updated', 'deleted'),
+        (entityType, action) => {
+          const rows = buildAuditRows([{ ...baseOperation, entityType, action }])
+          expect(rows).toHaveLength(1)
+          expect(rows[0].entity_type).toBe(entityType)
+          expect(rows[0].action).toBe(action)
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Property 13: Role permission enforcement
 // A user without permission for an action should be rejected regardless of other properties.
 // Validates: Requirements 1.4
@@ -392,6 +522,102 @@ describe('Property 13: Role permission enforcement', () => {
     fc.assert(
       fc.property(genRole(), (role) => {
         expect(hasPermission(role, 'nonexistent:action:xyz')).toBe(false)
+      }),
+      { numRuns: 50 }
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Property 14: Subscription renewal alert lead time
+// A renewal within 7 days of today must be flagged; one outside that window must not.
+// Validates: Requirements 11.3, 17.4
+// ---------------------------------------------------------------------------
+describe('Property 14: Subscription renewal alert lead time', () => {
+  it('a renewal 0-7 days out is flagged as renewing soon', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 7 }), (offset) => {
+        const sub = { renewal_date: dayOffset(offset), status: 'active' }
+        expect(flagRenewalWindow(sub, TODAY).renewing_soon).toBe(true)
+      }),
+      { numRuns: 100 }
+    )
+  })
+
+  it('a renewal more than 7 days out is not flagged', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 8, max: 3650 }), (offset) => {
+        const sub = { renewal_date: dayOffset(offset), status: 'active' }
+        expect(flagRenewalWindow(sub, TODAY).renewing_soon).toBe(false)
+      }),
+      { numRuns: 100 }
+    )
+  })
+
+  it('a renewal already in the past is not flagged as renewing soon', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: -3650, max: -1 }), (offset) => {
+        const sub = { renewal_date: dayOffset(offset), status: 'active' }
+        expect(flagRenewalWindow(sub, TODAY).renewing_soon).toBe(false)
+      }),
+      { numRuns: 100 }
+    )
+  })
+
+  it('the alert window respects a custom lead time', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 90 }),
+        fc.integer({ min: -30, max: 120 }),
+        (leadDays, offset) => {
+          const sub = { renewal_date: dayOffset(offset), status: 'active' }
+          const expected = offset >= 0 && offset <= leadDays
+          expect(flagRenewalWindow(sub, TODAY, leadDays).renewing_soon).toBe(expected)
+        }
+      ),
+      { numRuns: 200 }
+    )
+  })
+
+  it('a cancelled subscription never alerts, whatever its renewal date', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: -365, max: 365 }), (offset) => {
+        const sub = { renewal_date: dayOffset(offset), status: 'cancelled' }
+        expect(flagRenewalWindow(sub, TODAY).renewing_soon).toBe(false)
+      }),
+      { numRuns: 100 }
+    )
+  })
+
+  it('every subscription due for an alert is exactly one inside the window', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.integer({ min: -400, max: 400 }), { minLength: 1, maxLength: 40 }),
+        (offsets) => {
+          const subs = offsets.map((offset) => ({
+            renewal_date: dayOffset(offset),
+            status: 'active',
+          }))
+          const due = getSubscriptionsDueForAlert(subs, TODAY)
+          const expectedCount = offsets.filter((o) => o >= 0 && o <= 7).length
+          expect(due).toHaveLength(expectedCount)
+          for (const s of due) {
+            const days = daysUntil(s.renewal_date, TODAY)
+            expect(days).not.toBeNull()
+            expect(days as number).toBeGreaterThanOrEqual(0)
+            expect(days as number).toBeLessThanOrEqual(7)
+          }
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  it('a missing or unparseable renewal date never alerts', () => {
+    fc.assert(
+      fc.property(fc.constantFrom(null, undefined, '', 'not-a-date'), (value) => {
+        const sub = { renewal_date: value as string | null, status: 'active' }
+        expect(flagRenewalWindow(sub, TODAY).renewing_soon).toBe(false)
       }),
       { numRuns: 50 }
     )
@@ -451,6 +677,103 @@ describe('Property 15: Duplicate receipt detection (logic)', () => {
           expect(isDuplicateReceipt(existing, candidate)).toBe(false)
         }
       ),
+      { numRuns: 100 }
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Property 16: Vendor total paid invariant
+// A vendor's total paid equals the sum of converted_amount over its paid expenses.
+// Validates: Requirements 13.3
+// ---------------------------------------------------------------------------
+describe('Property 16: Vendor total paid invariant', () => {
+  it('total paid equals the sum of converted amounts of that vendor\'s paid expenses', () => {
+    fc.assert(
+      fc.property(
+        fc.array(genVendorExpense(), { minLength: 0, maxLength: 50 }),
+        fc.constantFrom(...VENDOR_IDS),
+        (expenses, vendorId) => {
+          const expected = expenses
+            .filter(
+              (e) => e.vendor_id === vendorId && e.status === 'paid' && !e.deleted_at
+            )
+            .reduce((sum, e) => sum + e.converted_amount, 0)
+          expect(calculateVendorTotalPaid(expenses, vendorId)).toBeCloseTo(expected, 4)
+        }
+      ),
+      { numRuns: 200 }
+    )
+  })
+
+  it('expenses that are not paid never contribute', () => {
+    fc.assert(
+      fc.property(
+        fc.array(
+          genVendorExpense().map((e) => ({ ...e, status: 'approved' })),
+          { minLength: 1, maxLength: 30 }
+        ),
+        fc.constantFrom(...VENDOR_IDS),
+        (expenses, vendorId) => {
+          expect(calculateVendorTotalPaid(expenses, vendorId)).toBe(0)
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  it('soft-deleted expenses never contribute', () => {
+    fc.assert(
+      fc.property(
+        fc.array(
+          genVendorExpense().map((e) => ({
+            ...e,
+            status: 'paid',
+            deleted_at: '2026-01-01T00:00:00Z',
+          })),
+          { minLength: 1, maxLength: 30 }
+        ),
+        fc.constantFrom(...VENDOR_IDS),
+        (expenses, vendorId) => {
+          expect(calculateVendorTotalPaid(expenses, vendorId)).toBe(0)
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  it('the total is never negative', () => {
+    fc.assert(
+      fc.property(
+        fc.array(genVendorExpense(), { maxLength: 50 }),
+        fc.constantFrom(...VENDOR_IDS),
+        (expenses, vendorId) => {
+          expect(calculateVendorTotalPaid(expenses, vendorId)).toBeGreaterThanOrEqual(0)
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  it('per-vendor totals sum to the total across all vendors', () => {
+    fc.assert(
+      fc.property(fc.array(genVendorExpense(), { maxLength: 60 }), (expenses) => {
+        const totals = calculateVendorTotals(expenses)
+        const summed = Object.values(totals).reduce((a, b) => a + b, 0)
+        const overall = expenses
+          .filter((e) => e.status === 'paid' && !e.deleted_at && e.vendor_id)
+          .reduce((sum, e) => sum + e.converted_amount, 0)
+        expect(summed).toBeCloseTo(overall, 4)
+      }),
+      { numRuns: 200 }
+    )
+  })
+
+  it('a vendor with no expenses has a total of zero', () => {
+    fc.assert(
+      fc.property(fc.array(genVendorExpense(), { maxLength: 30 }), (expenses) => {
+        expect(calculateVendorTotalPaid(expenses, 'vendor-with-nothing')).toBe(0)
+      }),
       { numRuns: 100 }
     )
   })

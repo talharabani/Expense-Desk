@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/auth/server'
 import { hasPermission } from '@/lib/auth/permissions'
 import { requireSupabaseClient } from '@/lib/auth/server'
 import { writeAuditLog } from '@/lib/audit/service'
+import { flagRenewalWindow } from '@/lib/subscriptions/utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,18 +29,13 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
     if (error) throw new Error(error.message)
 
-    // Flag subscriptions renewing within 7 days
+    // Flag subscriptions renewing within the alert lead time. The window is
+    // [today, today + 7d]: an upper bound alone flags every past renewal too.
     const today = new Date()
-    const in7Days = new Date(today)
-    in7Days.setDate(in7Days.getDate() + 7)
-
-    const enriched = (data ?? []).map((s: { renewal_date?: string | null; trial_expiry_date?: string | null; [key: string]: unknown }) => ({
-      ...s,
-      renewing_soon: s.renewal_date ? new Date(s.renewal_date) <= in7Days : false,
-      trial_expiring_soon: s.trial_expiry_date
-        ? new Date(s.trial_expiry_date) <= in7Days
-        : false,
-    }))
+    const enriched = (data ?? []).map(
+      (s: { renewal_date?: string | null; trial_expiry_date?: string | null; status?: string | null; [key: string]: unknown }) =>
+        flagRenewalWindow(s, today)
+    )
 
     return NextResponse.json(enriched)
   } catch (err) {

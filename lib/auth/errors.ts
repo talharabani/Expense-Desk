@@ -65,7 +65,15 @@ export function describeAuthError(error: RawAuthError): FriendlyAuthError {
     }
   }
 
-  if (code === 'otp_expired' || code === 'validation_failed') {
+  // GoTrue answers a consumed or unknown confirmation token with 403
+  // "One-time token not found" and no error code. A token is single-use, so
+  // this is also what a mail client's link prefetch leaves behind: the scanner
+  // spends the token, and the real click arrives to find it gone.
+  if (
+    code === 'otp_expired' ||
+    code === 'validation_failed' ||
+    /one-?time token not found|token (has )?expired|invalid token/i.test(raw)
+  ) {
     return {
       message:
         'That confirmation link has expired or has already been used. Send yourself a new one.',

@@ -71,6 +71,17 @@ cd "D:/expense tracker/expense-tracker"
 npm install
 ```
 
+> **Windows: do not commit a lockfile written by a Windows `npm install`.**
+> npm resolves the `wasm32-wasi` optional dependencies of `@tailwindcss/oxide`
+> only on Linux, so installing on Windows silently strips `@emnapi/core` and
+> `@emnapi/runtime` from `package-lock.json` — and CI then fails with
+> *Missing: @emnapi/runtime from lock file*. After adding or updating a
+> dependency, regenerate the lockfile on Linux before committing:
+>
+> ```bash
+> docker run --rm -v "$PWD:/app" -w /app node:24 npm install --package-lock-only
+> ```
+
 ---
 
 ## 2. Create the Supabase project
@@ -227,6 +238,7 @@ Testing is dual: Vitest unit tests plus `fast-check` property-based tests (minim
 | `Profile already exists` (409) | Setup ran twice | Expected — go to `/dashboard` |
 | Empty tables or permission errors | `run_all.sql` not run, or RLS blocking a user with no `users` row | Re-run `run_all.sql`; confirm your `users` row exists with the right `company_id` |
 | Uploads fail | `documents` bucket missing and no service role key | Create the bucket manually (§2b) or add the service key |
+| CI fails with `Missing: @emnapi/runtime from lock file` | `package-lock.json` was last written by `npm install` on Windows | Regenerate it on Linux: `docker run --rm -v "$PWD:/app" -w /app node:24 npm install --package-lock-only`, then commit |
 | Env change on Vercel had no effect | `NEXT_PUBLIC_*` baked at build time | Redeploy with build cache **off** |
 | `Error: spawn EPERM` during build | Intermittent worker-spawn failure on Windows — hits Turbopack *and* webpack, and is unrelated to your code or env vars | Just re-run `npm run build`; it succeeds on retry. If it persists, `npm run build:webpack`. Does not occur on Linux CI |
 | Auth redirect loops after deploy | Supabase Site URL / redirect URLs still point at localhost | Update §2c with the production domain |

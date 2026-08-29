@@ -31,13 +31,13 @@ jobs:
           node-version: 24
           cache: npm
 
-      # Should be `npm ci`, which is faster and enforces the lockfile. It fails
-      # today because package-lock.json was generated on Windows and omits
-      # @emnapi/core and @emnapi/runtime — transitive deps that npm only
-      # resolves on Linux. Regenerate the lockfile once on Linux (WSL, a
-      # container, or a Codespace) and this can go back to `npm ci`.
+      # package-lock.json must be regenerated on Linux (`docker run --rm -v
+      # "$PWD:/app" -w /app node:24 npm install --package-lock-only`). npm only
+      # resolves the wasm32-wasi optional dependencies of @tailwindcss/oxide
+      # there, so a lockfile written on Windows omits @emnapi/core and
+      # @emnapi/runtime and `npm ci` fails on the runner.
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci
 
       - name: Lint
         run: npm run lint

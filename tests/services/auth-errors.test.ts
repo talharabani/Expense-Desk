@@ -59,6 +59,20 @@ describe('describeAuthError', () => {
     }
   })
 
+  it('explains a mail-server timeout and says the account was not created', () => {
+    for (const status of [502, 503, 504]) {
+      const result = describeAuthError({ status, message: 'Gateway Timeout' })
+      expect(result.message).toMatch(/could not send the confirmation email/i)
+      expect(result.message).toMatch(/was not created/i)
+      expect(result.message).not.toMatch(/gateway timeout/i)
+    }
+  })
+
+  it('does not mistake a client error for a mail-server timeout', () => {
+    const result = describeAuthError({ status: 400, code: 'invalid_credentials' })
+    expect(result.message).not.toMatch(/mail server/i)
+  })
+
   it('asks the user to wait when rate limited', () => {
     for (const code of ['over_email_send_rate_limit', 'over_request_rate_limit']) {
       expect(describeAuthError({ code }).message).toMatch(/too many attempts/i)

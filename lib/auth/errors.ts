@@ -87,6 +87,18 @@ export function describeAuthError(error: RawAuthError): FriendlyAuthError {
     }
   }
 
+  // GoTrue sends the confirmation email synchronously during sign-up, so a slow
+  // or unreachable SMTP server times out the whole request. The account is not
+  // created, and retrying usually works — say that rather than showing
+  // "Gateway Timeout" or letting it surface as a bare fetch failure.
+  if (error.status === 504 || error.status === 502 || error.status === 503) {
+    return {
+      message:
+        'We could not send the confirmation email just now — the mail server did not respond. Your account was not created. Wait a minute and try again.',
+      action: null,
+    }
+  }
+
   if (code === 'weak_password') {
     return { message: 'That password is too weak. Use at least 8 characters.', action: null }
   }

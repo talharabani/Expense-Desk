@@ -31,11 +31,11 @@ jobs:
           node-version: 24
           cache: npm
 
-      # package-lock.json must be regenerated on Linux (`docker run --rm -v
-      # "$PWD:/app" -w /app node:24 npm install --package-lock-only`). npm only
-      # resolves the wasm32-wasi optional dependencies of @tailwindcss/oxide
-      # there, so a lockfile written on Windows omits @emnapi/core and
-      # @emnapi/runtime and `npm ci` fails on the runner.
+      # package-lock.json must be regenerated on Linux after any dependency
+      # change — npm only resolves the wasm32-wasi optional dependencies of
+      # @tailwindcss/oxide there, so a lockfile written on Windows omits
+      # @emnapi/core and @emnapi/runtime and `npm ci` fails here. See "Install
+      # dependencies" in SETUP.md for the command (it differs per shell).
       - name: Install dependencies
         run: npm ci
 

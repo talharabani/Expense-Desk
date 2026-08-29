@@ -78,8 +78,17 @@ npm install
 > *Missing: @emnapi/runtime from lock file*. After adding or updating a
 > dependency, regenerate the lockfile on Linux before committing:
 >
+> From `expense-tracker\` in **PowerShell** (`$PWD:` is a parse error there — the
+> braces are required):
+>
 > ```bash
-> docker run --rm -v "$PWD:/app" -w /app node:24 npm install --package-lock-only
+> docker run --rm -v "${PWD}:/app" -w /app node:24 npm install --package-lock-only
+> ```
+>
+> From **Git Bash**, `MSYS_NO_PATHCONV=1` stops the path being mangled:
+>
+> ```bash
+> MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD:/app" -w /app node:24 npm install --package-lock-only
 > ```
 
 ---
@@ -238,7 +247,7 @@ Testing is dual: Vitest unit tests plus `fast-check` property-based tests (minim
 | `Profile already exists` (409) | Setup ran twice | Expected — go to `/dashboard` |
 | Empty tables or permission errors | `run_all.sql` not run, or RLS blocking a user with no `users` row | Re-run `run_all.sql`; confirm your `users` row exists with the right `company_id` |
 | Uploads fail | `documents` bucket missing and no service role key | Create the bucket manually (§2b) or add the service key |
-| CI fails with `Missing: @emnapi/runtime from lock file` | `package-lock.json` was last written by `npm install` on Windows | Regenerate it on Linux: `docker run --rm -v "$PWD:/app" -w /app node:24 npm install --package-lock-only`, then commit |
+| CI fails with `Missing: @emnapi/runtime from lock file` | `package-lock.json` was last written by `npm install` on Windows | Regenerate it on Linux (see §1c for the PowerShell and Git Bash forms), then commit |
 | Env change on Vercel had no effect | `NEXT_PUBLIC_*` baked at build time | Redeploy with build cache **off** |
 | `Error: spawn EPERM` during build | Intermittent worker-spawn failure on Windows — hits Turbopack *and* webpack, and is unrelated to your code or env vars | Just re-run `npm run build`; it succeeds on retry. If it persists, `npm run build:webpack`. Does not occur on Linux CI |
 | Auth redirect loops after deploy | Supabase Site URL / redirect URLs still point at localhost | Update §2c with the production domain |

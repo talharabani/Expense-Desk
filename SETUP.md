@@ -238,6 +238,7 @@ npm run dev
 | Command | What it does |
 |---|---|
 | `npm run dev` | Dev server on :3000 |
+| `npm run dev:webpack` | Dev server without Turbopack — use when Turbopack cannot spawn its worker (see the `Access is denied` row below) |
 | `npm run build` | Production build (Turbopack) |
 | `npm run build:webpack` | Production build via webpack — use when Turbopack can't spawn workers locally |
 | `npm start` | Serve the production build |
@@ -281,6 +282,7 @@ Testing is dual: Vitest unit tests plus `fast-check` property-based tests (minim
 | Uploads fail | `documents` bucket missing and no service role key | Create the bucket manually (§2b) or add the service key |
 | CI fails with `Missing: @emnapi/runtime from lock file` | `package-lock.json` was last written by `npm install` on Windows | Regenerate it on Linux (see §1c for the PowerShell and Git Bash forms), then commit |
 | Env change on Vercel had no effect | `NEXT_PUBLIC_*` baked at build time | Redeploy with build cache **off** |
+| `Access is denied. (os error 5)` compiling `globals.css`, every page 500s | Security software is blocking Turbopack from spawning its PostCSS worker. 360 Total Security does this; Defender's real-time protection being off is a sign another product has taken over | Whitelist the project folder and `node.exe` in that product, or uninstall it. Workaround meanwhile: `npm run dev:webpack` |
 | `Error: spawn EPERM` during build | Intermittent worker-spawn failure on Windows — hits Turbopack *and* webpack, and is unrelated to your code or env vars | Just re-run `npm run build`; it succeeds on retry. If it persists, `npm run build:webpack`. Does not occur on Linux CI |
 | Auth redirect loops after deploy | Supabase Site URL / redirect URLs still point at localhost | Update §2c with the production domain |
 

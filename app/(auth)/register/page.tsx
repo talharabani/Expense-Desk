@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { describeAuthError, isExistingAccountSignUp } from '@/lib/auth/errors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,6 +28,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [existingAccount, setExistingAccount] = useState(false)
+  const [resent, setResent] = useState(false)
 
   async function handleRegister(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -56,7 +59,9 @@ export default function RegisterPage() {
     })
 
     if (signUpError) {
-      setError(signUpError.message)
+      const friendly = describeAuthError(signUpError)
+      setError(friendly.message)
+      setExistingAccount(friendly.action === 'sign_in')
       setLoading(false)
       return
     }
@@ -68,9 +73,32 @@ export default function RegisterPage() {
       return
     }
 
+    // Supabase answers a repeat sign-up with a success carrying no identities,
+    // so the address cannot be enumerated. Showing "check your email" here would
+    // promise a message that is never sent, for an account whose password is
+    // unchanged — say what actually happened instead.
+    if (isExistingAccountSignUp(data)) {
+      setError(
+        'An account with this email already exists. Sign in with your original password — registering again does not change it.'
+      )
+      setExistingAccount(true)
+      setLoading(false)
+      return
+    }
+
     // Email confirmation required
     setSuccess(true)
     setLoading(false)
+  }
+
+  async function handleResend() {
+    const supabase = createClient()
+    const { error: resendError } = await supabase.auth.resend({ type: 'signup', email })
+    if (resendError) {
+      setError(describeAuthError(resendError).message)
+      return
+    }
+    setResent(true)
   }
 
   if (success) {
@@ -84,6 +112,14 @@ export default function RegisterPage() {
               We sent a confirmation link to <strong>{email}</strong>.
               Click it to activate your account, then sign in.
             </p>
+            <p className="text-xs text-muted-foreground">
+              Nothing arrived? Supabase&apos;s built-in mail service is rate limited and often
+              delayed. Check spam, send the link again, or turn off{' '}
+              <em>Confirm email</em> in the Supabase dashboard to skip this step entirely.
+            </p>
+            <Button variant="outline" size="sm" onClick={handleResend} disabled={resent}>
+              {resent ? 'Link sent again' : 'Resend confirmation link'}
+            </Button>
             <Link href="/login">
               <Button className="mt-2">Go to login</Button>
             </Link>
@@ -117,7 +153,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key`}</pre>
           <CardContent>
             {error && (
               <Alert variant="destructive" className="mb-4">
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>
+                  {error}
+                  {existingAccount && (
+                    <Link href="/login" className="mt-2 block font-semibold underline">
+                      Go to sign in
+                    </Link>
+                  )}
+                </AlertDescription>
               </Alert>
             )}
 

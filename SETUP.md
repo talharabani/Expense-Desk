@@ -298,7 +298,32 @@ Testing is dual: Vitest unit tests plus `fast-check` property-based tests (minim
 
 ---
 
-## 8. Specs
+## 8. Keeping a free project awake
+
+A free Supabase project **pauses after 7 days without database activity**, and unpausing is manual — so the app stays down until someone notices. `.github/workflows/keepalive.yml` prevents that by reading one row from the `health_check` table every Monday and Thursday.
+
+**Setup, once:**
+
+1. Run `supabase/migrations/20240101000006_health_check.sql` in the SQL Editor. It creates a one-row table readable by the anon key and nothing else — no business data, no write policy.
+2. GitHub → your repo → **Settings → Secrets and variables → Actions → New repository secret**. Add two:
+   - `SUPABASE_URL` → `https://<project>.supabase.co`
+   - `SUPABASE_ANON_KEY` → the anon key
+3. **Actions** tab → **Supabase keep-alive** → **Run workflow** to test it now rather than waiting for Monday.
+
+Use the **anon** key, not the service role key. The ping needs no more privilege than a page load, and a repository secret is a poor place for a key that bypasses RLS.
+
+Run it locally against your `.env.local` any time:
+
+```bash
+npm run keepalive
+```
+
+**Two things that will bite you:**
+
+- **GitHub disables scheduled workflows after 60 days without repository activity**, and its own scheduled runs do not count. If the repo goes quiet for two months the keep-alive stops silently — and GitHub emails you before it does, so do not ignore that mail. Any push re-arms it.
+- **Scheduled runs are queued, not guaranteed on time.** GitHub can start them an hour or more late under load. Two runs a week leaves plenty of slack against a 7-day timeout; a single weekly run would not.
+
+## 9. Specs
 
 Requirements, design and the task list live in the outer workspace folder:
 

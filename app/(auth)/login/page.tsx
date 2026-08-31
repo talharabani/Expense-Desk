@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { describeAuthError } from '@/lib/auth/errors'
+import { normalizeEmail } from '@/lib/auth/email'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -45,7 +46,7 @@ function LoginForm() {
     setError(null)
 
     const supabase = createClient()
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email: normalizeEmail(email), password })
 
     if (signInError) {
       const friendly = describeAuthError(signInError)

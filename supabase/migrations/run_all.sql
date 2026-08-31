@@ -389,10 +389,13 @@ CREATE OR REPLACE FUNCTION get_my_company_id()
 RETURNS UUID LANGUAGE sql SECURITY DEFINER STABLE AS
 $$ SELECT company_id FROM public.users WHERE id = auth.uid() $$;
 
--- Allow setup: unauthenticated inserts for first-time company+user creation
--- (Controlled by the API route which verifies the session token)
-CREATE POLICY "allow_setup_company" ON companies FOR INSERT WITH CHECK (true);
-CREATE POLICY "allow_setup_user" ON users FOR INSERT WITH CHECK (id = auth.uid());
+-- First-run setup deliberately has NO policy of its own.
+--
+-- /api/setup creates the company and the owner's profile with the service role
+-- key, which bypasses RLS. Granting the browser an insert policy instead would
+-- mean letting a user choose their own company_id: get_my_company_id() reads
+-- that column, so naming someone else's company would expose that company's
+-- entire dataset. See 20240101000005_harden_setup_policies.sql.
 
 -- Company: owners can read/update
 CREATE POLICY "company_select" ON companies FOR SELECT USING (id = get_my_company_id());

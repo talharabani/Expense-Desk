@@ -143,15 +143,23 @@ Dashboard → **Authentication → URL Configuration**:
 
 Keeping *Confirm email* on needs three things. Miss any one and registration ends at a "check your email" screen for a message that never comes, or a link that goes nowhere.
 
-**1. A real mail sender.** Supabase's built-in service is for testing only: a few messages per hour, and on current projects it will only deliver to addresses belonging to project members. Every other address is silently dropped. Configure your own under **Project Settings → Authentication → SMTP Settings**:
+**1. A real mail sender.** Supabase's built-in service is for testing only: a few messages per hour, and on current projects it will only deliver to addresses belonging to project members. Every other address is silently dropped. Configure your own under **Project Settings → Authentication → SMTP Settings**.
 
-| Provider | Free tier | Host |
+Expect friction here. Free tiers are gated to keep spammers out, and each gate bites differently:
+
+| Provider | Host | The catch |
 |---|---|---|
-| Resend | 3,000/month | `smtp.resend.com:465` |
-| Brevo | 300/day | `smtp-relay.brevo.com:587` |
-| SendGrid | 100/day | `smtp.sendgrid.net:587` |
+| Resend | `smtp.resend.com:465` | Instant signup. Without a **verified domain** it only delivers to the address you registered with — fine for solo testing, useless for real users |
+| Mailjet | `in-v3.mailjet.com:587` | 200/day free, any recipient, but sending is blocked pending a **manual business review** that can take days |
+| SendGrid | `smtp.sendgrid.net:587` | 100/day, also subject to manual review |
+| Brevo | `smtp-relay.brevo.com:587` | SMTP relay is no longer on the free plan |
+| Gmail | `smtp.gmail.com:587` | Works with a Google **App Password** (needs 2-Step Verification), no review, no domain. But it throttles: bursts produce `504 Context deadline exceeded` on `/auth/v1/signup`, because GoTrue sends the mail synchronously and Gmail leaves the connection hanging |
 
-The sender address must be one the provider has verified — a domain you own, or the provider's sandbox sender. Raise **Rate limit for sending emails** under **Authentication → Rate Limits** afterwards; it stays at the built-in value until you do.
+**If you own a domain, verify it with Resend and stop here** — that path has no review queue and no recipient restriction. Everything else is a workaround.
+
+Raise **Rate limit for sending emails** under **Authentication → Rate Limits** afterwards; it stays at the built-in value until you do.
+
+**When mail is not working yet**, do not let it block development. Turn *Confirm email* **off** (§2c) and carry on: registration returns a session immediately, and every piece of the confirmation setup — the template, the redirect URLs, `/auth/confirm` — stays in place for when you turn it back on. Just remember the trade-off: with it off, anyone can register with an address they do not own.
 
 **2. The link must point at this app.** `signUp` sends `emailRedirectTo` pointing at `/auth/confirm`, which is a route handler in this repo: it verifies the token, sets the session cookie, and forwards to `/setup`. A failed or expired link lands on `/login` carrying the reason.
 

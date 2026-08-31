@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { describeAuthError, isExistingAccountSignUp } from '@/lib/auth/errors'
+import { normalizeEmail, validateEmail } from '@/lib/auth/email'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -35,6 +36,12 @@ export default function RegisterPage() {
     e.preventDefault()
     if (!isConfigured) return
 
+    const emailCheck = validateEmail(email)
+    if (!emailCheck.valid) {
+      setError(emailCheck.error!)
+      return
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match')
       return
@@ -51,7 +58,7 @@ export default function RegisterPage() {
 
     // Sign up the user with Supabase Auth
     const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
+      email: normalizeEmail(email),
       password,
       options: {
         data: { name },

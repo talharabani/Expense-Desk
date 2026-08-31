@@ -59,6 +59,13 @@ describe('describeAuthError', () => {
     }
   })
 
+  it('treats a consumed one-time token as a dead link, not a raw error', () => {
+    const result = describeAuthError({ status: 403, message: 'One-time token not found' })
+    expect(result.message).toMatch(/expired or has already been used/i)
+    expect(result.action).toBe('resend_confirmation')
+    expect(result.message).not.toMatch(/one-time token not found/i)
+  })
+
   it('explains a mail-server timeout and says the account was not created', () => {
     for (const status of [502, 503, 504]) {
       const result = describeAuthError({ status, message: 'Gateway Timeout' })

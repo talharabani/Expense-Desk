@@ -14,7 +14,8 @@
     "lint": "eslint",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "keepalive": "node scripts/keepalive.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

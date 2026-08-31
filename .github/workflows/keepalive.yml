@@ -1,0 +1,38 @@
+name: Supabase keep-alive
+
+on:
+  schedule:
+    # 06:00 UTC every Monday and Thursday — gaps of 3 and 4 days, comfortably
+    # inside the 7-day window a free project pauses after.
+    #
+    # Deliberately not "*/3" on day-of-month: that counter restarts each month,
+    # so a run on the 31st is followed by one on the 1st, and the schedule
+    # drifts against the week. Fixed weekdays stay predictable.
+    #
+    # GitHub queues scheduled jobs and can run them late under load, sometimes
+    # by an hour or more. Two runs a week absorbs that easily.
+    - cron: '0 6 * * 1,4'
+
+  # Lets you run it from the Actions tab to prove the setup works, rather than
+  # waiting until Monday to find out.
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # No npm install: the script uses only built-in fetch, so there is nothing
+      # to install and nothing to go stale.
+      - name: Ping Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: node scripts/keepalive.mjs
